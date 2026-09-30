@@ -1,0 +1,63 @@
+ QualiEdge AI: On-Device Visual Inspection & Operator Advisory System
+
+Theme: Industry and Manufacturing  
+Target Hardware: Raspberry Pi 5 (Arm Cortex-A76)  
+
+ 1. Project Objective
+QualiEdge AI is a zero-cloud, real-time visual inspection system designed for [PCB / Textile] manufacturing.
+It detects surface anomalies using a lightweight vision model and utilizes an on-device Large Language Model (Llama 3.2 via ExecuTorch)
+to provide actionable repair guidance to factory operators.
+
+ 2. Technology Stack & Justification
+To ensure cost-effectiveness and high performance on edge hardware, the system relies on the following open-source stack:
+*   Vision Detection: YOLO26 (Nano) – Chosen for state-of-the-art inference speed on Arm CPUs/NPUs.
+      When using Hailo also:Yolov8n for max speed and YOLOv8s or YOLOv8m for Accuracy
+*   Advisory Engine: Llama-3.2-1B-Instruct (4-bit Quantized) – Lightweight edge LLM providing high-quality reasoning without exhausting system RAM.
+*   Runtime: ExecuTorch (XNNPACK backend) for Llama; ONNX Runtime / HailoRT for Vision.
+*   Image Processing: OpenCV for handling factory noise (glare, dust reduction).
+
+ 3. System Architecture
+The system employs a strict dual-pipeline isolation strategy to prevent hardware bottlenecking:
+
+1.  Vision Pipeline (Continuous): Camera frames are captured at 30 FPS. OpenCV applies [CLAHE / Gaussian Blur] to reduce environmental noise.
+YOLO11n processes every 5th frame to detect [Solder Bridges / Fabric Tears].
+2.  Reasoning Pipeline (Asynchronous): Upon detecting a confirmed defect (confidence > 85% for 3 consecutive frames),
+the defect metadata (class, location, severity) is passed to the ExecuTorch runtime. Llama generates a structured 2-bullet action plan for the operator.
+
+ 4. Implementation Details
+
+ 4.1 Vision Pipeline
+*   Dataset: [DeepPCB / MVTec AD]
+*   Classes Trained: [List your classes, e.g., Short, Open, Missing Hole]
+*   Export Format: PyTorch `.pt` converted to `ONNX` [and `.hef` for Hailo if used].
+
+ 4.2 ExecuTorch & Llama Setup
+*   Model Source: `meta-llama/Llama-3.2-1B-Instruct`
+*   Quantization: INT4 weight quantization via ExecuTorch XNNPACK backend.
+*   Prompt Structure:*
+    *   System: "You are a factory QC assistant. Keep answers under 50 words."
+    *   User: "Defect: [Class], Location: [X, Y], Severity: High. Provide immediate operator action."
+
+ 5. Performance Benchmarks (Target Hardware: Raspberry Pi 5)
+*(Note: Replace with actual numbers after testing)*
+
+| Metric | Measured Performance |
+| :--- | :--- |
+| **Vision Inference (YOLO11n)** | `[XX]` FPS (CPU-only) / `[XX]` FPS (Hailo NPU) |
+| **Llama Generation (ExecuTorch)** | `[XX]` Tokens per second (TPS) |
+| **Time-to-First-Token (TTFT)** | `[XX]` ms |
+| **Peak RAM Utilization** | `[XX]` GB / 8.0 GB |
+| **Vision Accuracy (mAP@0.5)** | `[XX]` % |
+
+ 6. Real-World Factory Readiness
+To handle industrial noise (oil, dust, uneven lighting), the system implements software-level contrast equalization using OpenCV.
+Running fully on-device eliminates factory bandwidth constraints and data privacy concerns. The total hardware BoM (Bill of Materials) is approx.
+₹12,000, making it highly accessible for MSME deployment.
+
+ 7. Setup & Execution Instructions
+1. Clone the repository: `git clone [URL]`
+2. Install requirements: `pip install -r requirements.txt`
+3. Download the exported models:
+   * YOLO `.onnx` placed in `/models/vision/`
+   * Llama `.pte` placed in `/models/llm/`
+4. Run the main pipeline: `python src/app/main.py`
